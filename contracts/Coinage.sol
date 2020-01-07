@@ -67,7 +67,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
   }
 
   function factor() public view returns (uint256) {
-    return _factor;
+    return _applyFactor(_factor);
   }
 
   function factorIncrement() public view returns (uint256) {
@@ -78,14 +78,16 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * @dev See {IERC20-totalSupply}.
     */
   function totalSupply() public view returns (uint256) {
-    return _toRAYFactored(_totalSupply);
+    // return _toRAYFactored(_totalSupply);
+    return _applyFactor(_totalSupply);
   }
 
   /**
     * @dev See {IERC20-balanceOf}.
     */
   function balanceOf(address account) public view returns (uint256) {
-    return _toRAYFactored(_balances[account]);
+    // return _toRAYFactored(_balances[account]);
+    return _applyFactor(_balances[account]);
   }
 
   /**
@@ -265,7 +267,6 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(_toRAYFactored(rbAmount), "ERC20: burn amount exceeds allowance"));
   }
 
-
   // helpers
   /**
    * @dev Calculate RAY BASED from RAY FACTORED
@@ -279,5 +280,15 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
    */
   function _toRAYFactored(uint256 rb) internal view returns (uint256 rf) {
     return rmul(rb, _factor);
+  }
+
+  function _applyFactor(uint256 r) internal view returns (uint256) {
+    uint256 n = block.number - _lastBlock;
+
+    if (n == 0) {
+      return r;      
+    }
+    
+    return rmul(r, rmul(_factor, rpow(_factorIncrement, n)));
   }
 }
