@@ -3,8 +3,13 @@
   "version": "1.0.0",
   "description": "",
   "main": "truffle-config.js",
+  "scripts": {
+    "test": "mocha --exit --bail --recursive test",
+    "test:compile": "npm run compile && npm run test",
+    "compile": "truffle compile"
+  },
   "directories": {
-    "test": "truffle test --exit",
+    "test": "truffle test --exit --bail",
     "build": "truffle compile"
   },
   "dependencies": {},
@@ -21,11 +26,6 @@
     "mocha": "^7.0.0",
     "openzeppelin-solidity": "^2.4.0",
     "truffle": "^5.1.7"
-  },
-  "scripts": {
-    "test": "mocha --exit --recursive test",
-    "test:compile": "npm run compile && npm run test",
-    "compile": "truffle compile"
   },
   "repository": {
     "type": "git",
