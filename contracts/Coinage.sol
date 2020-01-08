@@ -99,7 +99,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * - the caller must have a balance of at least `amount`.
     */
   function transfer(address recipient, uint256 amount) public returns (bool) {
-    _transfer(_msgSender(), recipient, _toRAYBased(amount));
+    _transfer(_msgSender(), recipient, amount);
     return true;
   }
 
@@ -135,7 +135,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * `amount`.
     */
   function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
-    _transfer(sender, recipient, _toRAYBased(amount));
+    _transfer(sender, recipient, amount);
     _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
     return true;
   }
@@ -177,7 +177,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
   }
 
   /**
-    * @dev Moves tokens `rbAmount` from `sender` to `recipient`.
+    * @dev Moves tokens `amount` from `sender` to `recipient`.
     *
     * This is internal function is equivalent to {transfer}, and can be used to
     * e.g. implement automatic token fees, slashing mechanisms, etc.
@@ -188,18 +188,20 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     *
     * - `sender` cannot be the zero address.
     * - `recipient` cannot be the zero address.
-    * - `sender` must have a balance of at least `rbAmount`.
+    * - `sender` must have a balance of at least `amount`.
     */
-  function _transfer(address sender, address recipient, uint256 rbAmount) internal increaseFactor {
+  function _transfer(address sender, address recipient, uint256 amount) internal increaseFactor {
     require(sender != address(0), "ERC20: transfer from the zero address");
     require(recipient != address(0), "ERC20: transfer to the zero address");
+
+    uint256 rbAmount = _toRAYBased(amount);
 
     _balances[sender] = _balances[sender].sub(rbAmount, "ERC20: transfer amount exceeds balance");
     _balances[recipient] = _balances[recipient].add(rbAmount);
     emit Transfer(sender, recipient, _toRAYFactored(rbAmount));
   }
 
-  /** @dev Creates `rbAmount` tokens and assigns them to `account`, increasing
+  /** @dev Creates `amount` tokens and assigns them to `account`, increasing
     * the total supply.
     *
     * Emits a {Transfer} event with `from` set to the zero address.
@@ -208,8 +210,10 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     *
     * - `to` cannot be the zero address.
     */
-  function _mint(address account, uint256 rbAmount) internal increaseFactor {
+  function _mint(address account, uint256 amount) internal increaseFactor {
     require(account != address(0), "ERC20: mint to the zero address");
+
+    uint256 rbAmount = _toRAYBased(amount);
 
     _totalSupply = _totalSupply.add(rbAmount);
     _balances[account] = _balances[account].add(rbAmount);
@@ -217,7 +221,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
   }
 
     /**
-    * @dev Destroys `rbAmount` tokens from `account`, reducing the
+    * @dev Destroys `amount` tokens from `account`, reducing the
     * total supply.
     *
     * Emits a {Transfer} event with `to` set to the zero address.
@@ -225,10 +229,12 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * Requirements
     *
     * - `account` cannot be the zero address.
-    * - `account` must have at least `rbAmount` tokens.
+    * - `account` must have at least `amount` tokens.
     */
-  function _burn(address account, uint256 rbAmount) internal increaseFactor {
+  function _burn(address account, uint256 amount) internal increaseFactor {
     require(account != address(0), "ERC20: burn from the zero address");
+
+    uint256 rbAmount = _toRAYBased(amount);
 
     _balances[account] = _balances[account].sub(rbAmount, "ERC20: burn amount exceeds balance");
     _totalSupply = _totalSupply.sub(rbAmount);
@@ -262,9 +268,9 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     *
     * See {_burn} and {_approve}.
     */
-  function _burnFrom(address account, uint256 rbAmount) internal {
-    _burn(account, rbAmount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(_toRAYFactored(rbAmount), "ERC20: burn amount exceeds allowance"));
+  function _burnFrom(address account, uint256 amount) internal increaseFactor {
+    _burn(account, amount);
+    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "ERC20: burn amount exceeds allowance"));
   }
 
   // helpers
@@ -286,9 +292,9 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     uint256 n = block.number - _lastBlock;
 
     if (n == 0) {
-      return r;      
+      return rmul(r, _factor);
     }
-    
+
     return rmul(r, rmul(_factor, rpow(_factorIncrement, n)));
   }
 }
