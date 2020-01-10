@@ -71,6 +71,18 @@ contract DSMath {
   //  Also, EVM division is flooring and
   //  floor[(n-1) / 2] = floor[n / 2].
   //
+  function wpow(uint x, uint n) internal pure returns (uint z) {
+    z = n % 2 != 0 ? x : WAD;
+
+    for (n /= 2; n != 0; n /= 2) {
+      x = wmul(x, x);
+
+      if (n % 2 != 0) {
+        z = wmul(z, x);
+      }
+    }
+  }
+
   function rpow(uint x, uint n) internal pure returns (uint z) {
     z = n % 2 != 0 ? x : RAY;
 

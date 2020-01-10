@@ -82,6 +82,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     return _applyFactor(_totalSupply);
   }
 
+
   /**
     * @dev See {IERC20-balanceOf}.
     */
