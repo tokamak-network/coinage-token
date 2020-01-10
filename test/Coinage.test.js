@@ -1,3 +1,5 @@
+const range = require('lodash/range');
+
 const {
   defaultSender, accounts, contract, web3,
 } = require('@openzeppelin/test-environment');
@@ -27,19 +29,40 @@ describe('Coinage', function () {
 
   const initialSupply = CAG('10000');
 
+  // 365 * 24 * 60 * 60 / 15 = 2102400 blocks
+  // https://www.monkiapp.co/kr/%EB%B3%B5%EB%A6%AC-%EA%B3%84%EC%82%B0%EA%B8%B0
+  // factorIncrement = CAG('1.00000008799');
+
+  beforeEach(async function () {
+    factor = CAG('1.00');
+    factorIncrement = CAG('1.10');
+
+    this.coinage = await deploy();
+  });
+
   function deploy () {
     return Coinage.new(
-      'Coinage Tesg',
+      'Coinage Test',
       'CAT',
       factor.toFixed('ray'),
       factorIncrement.toFixed('ray'),
     );
   }
 
-  async function advanceRandomBlock () {
-    const n = Math.floor(Math.random() * 20) + 1;
+  // TODO: exponentiation by squaring?
+  function fpow (v, n) {
+    let f = factor;
+    for (let i = 0; i < n; i++) {
+      f = f.times(factorIncrement);
+    }
+    return v.times(f);
+  }
 
-    await Promise.all(Array(n).fill(0).map(_ => time.advanceBlock()));
+  async function advanceRandomBlock (min) {
+    const n = Math.floor(Math.random() * 20) + (min || 1);
+
+    await Promise.all(range(n).map(_ => time.advanceBlock()));
+    return n;
   }
 
   /**
@@ -57,17 +80,6 @@ describe('Coinage', function () {
     toBN(balance.toFixed('ray')).sub(toBN(expected.toFixed('ray'))).abs()
       .should.be.bignumber.lte(e);
   }
-
-  // 365 * 24 * 60 * 60 / 15 = 2102400 blocks
-  // https://www.monkiapp.co/kr/%EB%B3%B5%EB%A6%AC-%EA%B3%84%EC%82%B0%EA%B8%B0
-  // factorIncrement = CAG('1.00000008799');
-
-  beforeEach(async function () {
-    factor = CAG('1.00');
-    factorIncrement = CAG('1.10');
-
-    this.coinage = await deploy();
-  });
 
   describe('#factor', function () {
     it('should not be change just after deployed', async function () {
@@ -96,8 +108,6 @@ describe('Coinage', function () {
       await time.advanceBlock();
       await time.advanceBlock();
 
-      // await this.coinage.mint(accounts[0], 0);
-
       const expectedFactor = factor.times(factorIncrement).times(factorIncrement)
         .times(factorIncrement).times(factorIncrement);
 
@@ -105,21 +115,30 @@ describe('Coinage', function () {
     });
 
     // TODO: add test cases for total supply and balanceOf
-
-    it('should mint amount of tokens with minor error', async function () {
+    describe('balance and total supply', function () {
       const tokenOwner = accounts[0];
       const amount = CAG('1000');
 
-      await time.advanceBlock();
-      await time.advanceBlock();
-      await time.advanceBlock();
-      await time.advanceBlock();
+      beforeEach(async function () {
+        await this.coinage.mint(tokenOwner, amount.toFixed('ray'));
+      });
 
-      await advanceRandomBlock();
+      it('should mint amount of tokens', async function () {
+        await checkBalanceProm(this.coinage.balanceOf(tokenOwner), amount);
+      });
 
-      await this.coinage.mint(tokenOwner, amount.toFixed('ray'));
+      it('balance should increase exponentially after n blocks', async function () {
+        const n = await advanceRandomBlock(4);
+        const expectedAmount = fpow(amount, n);
+        await checkBalanceProm(this.coinage.balanceOf(tokenOwner), expectedAmount);
+      });
 
-      await checkBalanceProm(this.coinage.balanceOf(tokenOwner), amount);
+      it('total supply should increase exponentially after n blocks', async function () {
+        const totalSupply = CAG(await this.coinage.totalSupply(), 'ray');
+        const n = await advanceRandomBlock(4);
+        const expectedTotalSupply = fpow(totalSupply, n);
+        await checkBalanceProm(this.coinage.totalSupply(), expectedTotalSupply);
+      });
     });
   });
 
