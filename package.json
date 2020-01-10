@@ -27,6 +27,7 @@
     "eslint-plugin-standard": "^4.0.1",
     "ethlint": "^1.2.5",
     "ganache-cli": "^6.7.0",
+    "lodash": "^4.17.15",
     "mocha": "^7.0.0",
     "openzeppelin-solidity": "^2.4.0",
     "truffle": "^5.1.7"
