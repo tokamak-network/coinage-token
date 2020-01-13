@@ -5,8 +5,10 @@ import { SafeMath } from "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import { Context } from "openzeppelin-solidity/contracts/GSN/Context.sol";
 import { DSMath } from "./lib/DSMath.sol";
 
+import { Ownable } from "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import { IERC20 } from "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
+
 
 
 /**
@@ -22,7 +24,7 @@ import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20
  *
  *  factor increases exponentially for each block mined.
  */
-contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
+contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
   using SafeMath for uint256;
 
   mapping (address => uint256) private _balances;
@@ -37,19 +39,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
 
   uint256 private _lastBlock;
 
-  constructor (
-    string memory name,
-    string memory symbol,
-    uint256 factor,
-    uint256 factorIncrement
-  )
-    public
-    ERC20Detailed(name, symbol, 27)
-  {
-    _factor = factor;
-    _factorIncrement = factorIncrement;
-    _lastBlock = block.number;
-  }
+  bool private _transferEnabled;
 
   event FactorIncreased(uint256 factor);
 
@@ -66,12 +56,39 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     _;
   }
 
+  modifier onlyTransferEnabled() {
+    require(msg.sender == owner() || _transferEnabled, "Coinage: transfer not allowed");
+    _;
+  }
+
+  constructor (
+    string memory name,
+    string memory symbol,
+    uint256 factor,
+    uint256 factorIncrement
+  )
+    public
+    ERC20Detailed(name, symbol, 27)
+  {
+    _factor = factor;
+    _factorIncrement = factorIncrement;
+    _lastBlock = block.number;
+  }
+
   function factor() public view returns (uint256) {
     return _applyFactor(_factor);
   }
 
   function factorIncrement() public view returns (uint256) {
     return _factorIncrement;
+  }
+
+  function transferEnabled() public returns (bool) {
+    return _transferEnabled;
+  }
+
+  function enableTransfer(bool transferEnabled) public onlyOwner {
+    _transferEnabled = transferEnabled;
   }
 
   /**
@@ -99,7 +116,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * - `recipient` cannot be the zero address.
     * - the caller must have a balance of at least `amount`.
     */
-  function transfer(address recipient, uint256 amount) public returns (bool) {
+  function transfer(address recipient, uint256 amount) public onlyTransferEnabled returns (bool) {
     _transfer(_msgSender(), recipient, amount);
     return true;
   }
@@ -135,7 +152,7 @@ contract Coinage is Context, IERC20, DSMath, ERC20Detailed {
     * - the caller must have allowance for `sender`'s tokens of at least
     * `amount`.
     */
-  function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
+  function transferFrom(address sender, address recipient, uint256 amount) public onlyTransferEnabled returns (bool) {
     _transfer(sender, recipient, amount);
     _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
     return true;
