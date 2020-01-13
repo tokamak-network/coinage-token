@@ -184,6 +184,7 @@ describe('Coinage', function () {
 
             const { logs } = await this.coinage.transfer(to, amount.toFixed('ray'), { from });
 
+            // NOTE: use expectEvent.inLogs instead of expectEvent to capture returned event.
             const e = expectEvent.inLogs(logs, 'Transfer', {
               from,
               to,
@@ -212,6 +213,7 @@ describe('Coinage', function () {
           it('emits a transfer event', async function () {
             const { logs } = await this.coinage.transfer(to, amount.toFixed('ray'), { from });
 
+            // NOTE: use expectEvent.inLogs instead of expectEvent to capture returned event.
             const e = expectEvent.inLogs(logs, 'Transfer', {
               from,
               to,
