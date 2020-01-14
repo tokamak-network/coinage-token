@@ -39,7 +39,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
 
   uint256 private _lastBlock;
 
-  bool private _transferEnabled;
+  bool private _transfersEnabled;
 
   event FactorIncreased(uint256 factor);
 
@@ -56,8 +56,8 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     _;
   }
 
-  modifier onlyTransferEnabled() {
-    require(msg.sender == owner() || _transferEnabled, "Coinage: transfer not allowed");
+  modifier onlyTransfersEnabled() {
+    require(msg.sender == owner() || _transfersEnabled, "Coinage: transfer not allowed");
     _;
   }
 
@@ -83,12 +83,12 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     return _factorIncrement;
   }
 
-  function transferEnabled() public returns (bool) {
-    return _transferEnabled;
+  function transfersEnabled() public returns (bool) {
+    return _transfersEnabled;
   }
 
-  function enableTransfer(bool transferEnabled) public onlyOwner {
-    _transferEnabled = transferEnabled;
+  function enableTransfers(bool v) public onlyOwner {
+    _transfersEnabled = v;
   }
 
   /**
@@ -116,7 +116,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `recipient` cannot be the zero address.
     * - the caller must have a balance of at least `amount`.
     */
-  function transfer(address recipient, uint256 amount) public onlyTransferEnabled returns (bool) {
+  function transfer(address recipient, uint256 amount) public onlyTransfersEnabled returns (bool) {
     _transfer(_msgSender(), recipient, amount);
     return true;
   }
@@ -152,7 +152,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - the caller must have allowance for `sender`'s tokens of at least
     * `amount`.
     */
-  function transferFrom(address sender, address recipient, uint256 amount) public onlyTransferEnabled returns (bool) {
+  function transferFrom(address sender, address recipient, uint256 amount) public onlyTransfersEnabled returns (bool) {
     _transfer(sender, recipient, amount);
     _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
     return true;
