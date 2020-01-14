@@ -116,6 +116,8 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     uint _parentSnapShotBlock,
     string memory _tokenName,
     string memory _tokenSymbol,
+    uint _factor,
+    uint _factorIncrement,
     bool _transfersEnabled
   ) public {
     tokenFactory = CoinageSnapshotFactory(_tokenFactory);
@@ -123,10 +125,11 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     symbol = _tokenSymbol;              // Set the symbol
     parentToken = CoinageSnapshot(_parentToken);
     parentSnapShotBlock = _parentSnapShotBlock;
+    factorIncrement = _factorIncrement;
     transfersEnabled = _transfersEnabled;
     creationBlock = block.number;
 
-    uint factor;
+    uint factor = _factor;
 
     if (isContract(address(parentToken))) {
       factor = parentToken.factorAt(parentSnapShotBlock);
@@ -169,8 +172,9 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
       require(transfersEnabled);
 
       // The standard ERC 20 transferFrom functionality
-      require(allowed[_from][msg.sender] >= _amount);
+      require(allowed[_from][msg.sender] >= _amount, "CoinageSnapshot: transfer amount exceeds allowance");
       allowed[_from][msg.sender] -= _amount;
+      emit Approval(_from, msg.sender, allowed[_from][msg.sender]);
     }
     doTransfer(_from, _to, _amount);
     return true;
@@ -189,23 +193,22 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
          return;
        }
 
-       require(parentSnapShotBlock < block.number);
+       require(parentSnapShotBlock < block.number, "T?");
 
        // Do not allow transfer to 0x0 or the token contract itself
-       require((_to != address(0)) && (_to != address(this)));
+       require(_to != address(0), "CoinageSnapshot: transfer to the zero address");
+       require(_to != address(this), "CoinageSnapshot: transfer to CoinageSnapshot");
 
        // If the amount being transfered is more than the balance of the
        //  account the transfer throws
        uint previousBalanceFrom = basedBalanceOfAt(_from, block.number);
        uint wbAmount = _toWADBased(_amount, block.number);
 
-       require(previousBalanceFrom >= _amount);
-
+       require(previousBalanceFrom >= wbAmount, "CoinageSnapshot: transfer amount exceeds balance");
        // Alerts the token controller of the transfer
        if (isContract(controller)) {
-         require(TokenController(controller).onTransfer(_from, _to, _amount));
+         require(TokenController(controller).onTransfer(_from, _to, _toWADFactored(wbAmount, block.number)));
        }
-
 
        // First update the balance array with the new value for the address
        //  sending the tokens
@@ -241,7 +244,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     //  allowance to zero by calling `approve(_spender,0)` if it is not
     //  already 0 to mitigate the race condition described here:
     //  https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
-    require((_amount == 0) || (allowed[msg.sender][_spender] == 0));
+    require((_amount == 0) || (allowed[msg.sender][_spender] == 0), "CoinageSnapshot: invalid approve amount");
 
     // Alerts the token controller of the approve function call
     if (isContract(controller)) {
@@ -302,7 +305,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   /// @dev Queries the balance of `_owner` at a specific `_blockNumber`
   /// @param _owner The address from which the balance will be retrieved
   /// @param _blockNumber The block number when the balance is queried
-  /// @return The balance at `_blockNumber`
+  /// @return The balance at `_blockNumber` in WAS FACTORED
   function balanceOfAt(address _owner, uint _blockNumber) public view returns (uint) {
     return _applyFactorAt(basedBalanceOfAt(_owner, _blockNumber), _blockNumber);
   }
@@ -334,9 +337,15 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
 
   /// @notice Total amount of tokens at a specific `_blockNumber`.
   /// @param _blockNumber The block number when the totalSupply is queried
-  /// @return The total amount of tokens at `_blockNumber`
+  /// @return The total amount of tokens at `_blockNumber` in WAS FACTORED
   function totalSupplyAt(uint _blockNumber) public view returns (uint) {
-    uint r;
+    return _applyFactorAt(basedTotalSupplyAt(_blockNumber), _blockNumber);
+  }
+
+  /// @notice Total amount of tokens at a specific `_blockNumber`.
+  /// @param _blockNumber The block number when the totalSupply is queried
+  /// @return The total amount of tokens at `_blockNumber` in WAS BASED
+  function basedTotalSupplyAt(uint _blockNumber) public view returns (uint) {
 
     // These next few lines are used when the totalSupply of the token is
     //  requested before a check point was ever created for this token, it
@@ -346,17 +355,15 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     if ((totalSupplyHistory.length == 0)
       || (totalSupplyHistory[0].fromBlock > _blockNumber)) {
       if (address(parentToken) != address(0)) {
-        r = parentToken.totalSupplyAt(min(_blockNumber, parentSnapShotBlock));
+        return parentToken.totalSupplyAt(min(_blockNumber, parentSnapShotBlock));
       } else {
-        r = 0;
+        return 0;
       }
 
     // This will return the expected totalSupply during normal situations
     } else {
-      r = getValueAt(totalSupplyHistory, _blockNumber);
+      return getValueAt(totalSupplyHistory, _blockNumber);
     }
-
-    return _applyFactorAt(r, _blockNumber);
   }
 
   /// @notice Factor at a specific `_blockNumber`.
@@ -394,15 +401,17 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   function generateTokens(address _owner, uint _amount)
     public
     onlyController
+    increaseFactor
     returns (bool)
   {
-    uint curTotalSupply = totalSupply();
-    require(uint128(curTotalSupply + _amount) >= curTotalSupply); // Check for overflow
-    uint previousBalanceTo = balanceOf(_owner);
-    require(uint128(previousBalanceTo + _amount) >= previousBalanceTo); // Check for overflow
-    updateValueAtNow(totalSupplyHistory, curTotalSupply + _amount);
-    updateValueAtNow(balances[_owner], previousBalanceTo + _amount);
-    emit Transfer(address(0), _owner, _amount);
+    uint wbAmount = _toWADBased(_amount, block.number);
+    uint curTotalSupply = basedTotalSupplyAt(block.number);
+    require(uint128(curTotalSupply + wbAmount) >= curTotalSupply); // Check for overflow
+    uint previousBalanceTo = basedBalanceOfAt(_owner, block.number);
+    require(uint128(previousBalanceTo + wbAmount) >= previousBalanceTo); // Check for overflow
+    updateValueAtNow(totalSupplyHistory, curTotalSupply + wbAmount);
+    updateValueAtNow(balances[_owner], previousBalanceTo + wbAmount);
+    emit Transfer(address(0), _owner, _toWADFactored(wbAmount, block.number));
     return true;
   }
 
@@ -413,16 +422,18 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   /// @return True if the tokens are burned correctly
   function destroyTokens(address _owner, uint _amount)
     onlyController
+    increaseFactor
     public
     returns (bool)
   {
-    uint curTotalSupply = totalSupply();
-    require(curTotalSupply >= _amount);
-    uint previousBalanceFrom = balanceOf(_owner);
-    require(previousBalanceFrom >= _amount);
-    updateValueAtNow(totalSupplyHistory, curTotalSupply - _amount);
-    updateValueAtNow(balances[_owner], previousBalanceFrom - _amount);
-    emit Transfer(_owner, address(0), _amount);
+    uint wbAmount = _toWADBased(_amount, block.number);
+    uint curTotalSupply = basedTotalSupplyAt(block.number);
+    require(curTotalSupply >= wbAmount);
+    uint previousBalanceFrom = basedBalanceOfAt(_owner, block.number);
+    require(previousBalanceFrom >= wbAmount);
+    updateValueAtNow(totalSupplyHistory, curTotalSupply - wbAmount);
+    updateValueAtNow(balances[_owner], previousBalanceFrom - wbAmount);
+    emit Transfer(_owner, address(0), _toWADFactored(wbAmount, block.number));
     return true;
   }
 
@@ -554,8 +565,10 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   }
 
   function _applyFactorAt(uint256 v, uint256 blockNumber) internal view returns (uint256) {
-    uint256 n = sub(blockNumber, blockNumber);
-    uint256 f = factorAt(n);
+    uint256 f = factorAt(blockNumber);
+
+    uint256 lastBlockNumber = factorHistory[factorHistory.length - 1].fromBlock;
+    uint256 n = sub(blockNumber, lastBlockNumber);
 
     if (n == 0) {
       return wmul(v, f);
@@ -587,14 +600,11 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
 ////////////////
 // Events
 ////////////////
-  event ClaimedTokens(address indexed _token, address indexed _controller, uint _amount);
-  event Transfer(address indexed _from, address indexed _to, uint256 _amount);
-  event NewCloneToken(address indexed _cloneToken, uint _snapshotBlock);
-  event Approval(
-    address indexed _owner,
-    address indexed _spender,
-    uint256 _amount
-    );
+  event ClaimedTokens(address indexed token, address indexed controller, uint value);
+  event Transfer(address indexed from, address indexed to, uint256 value);
+  event NewCloneToken(address indexed cloneToken, uint snapshotBlock);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
+
   event FactorIncreased(uint256 factor);
 }
 
@@ -622,6 +632,8 @@ contract CoinageSnapshotFactory {
     uint _snapshotBlock,
     string memory _tokenName,
     string memory _tokenSymbol,
+    uint _factor,
+    uint _factorIncrement,
     bool _transfersEnabled
   ) public returns (CoinageSnapshot) {
     CoinageSnapshot newToken = new CoinageSnapshot(
@@ -630,6 +642,8 @@ contract CoinageSnapshotFactory {
       _snapshotBlock,
       _tokenName,
       _tokenSymbol,
+      _factor,
+      _factorIncrement,
       _transfersEnabled
       );
 
