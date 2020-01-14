@@ -9,9 +9,10 @@ contract CoinageMock is ERC20Mintable, ERC20Burnable, Coinage {
     string memory name,
     string memory symbol,
     uint256 factor,
-    uint256 factorIncrement
+    uint256 factorIncrement,
+    bool transfersEnabled
   )
     public
-    Coinage(name, symbol, factor, factorIncrement)
+    Coinage(name, symbol, factor, factorIncrement, transfersEnabled)
   {}
 }

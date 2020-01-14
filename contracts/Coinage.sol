@@ -65,7 +65,8 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     string memory name,
     string memory symbol,
     uint256 factor,
-    uint256 factorIncrement
+    uint256 factorIncrement,
+    bool transfersEnabled
   )
     public
     ERC20Detailed(name, symbol, 27)
@@ -73,6 +74,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     _factor = factor;
     _factorIncrement = factorIncrement;
     _lastBlock = block.number;
+    _transfersEnabled = transfersEnabled;
   }
 
   function factor() public view returns (uint256) {
@@ -154,7 +156,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     */
   function transferFrom(address sender, address recipient, uint256 amount) public onlyTransfersEnabled returns (bool) {
     _transfer(sender, recipient, amount);
-    _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
+    _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "Coinage: transfer amount exceeds allowance"));
     return true;
   }
 
@@ -190,7 +192,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * `subtractedValue`.
     */
   function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
+    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "Coinage: decreased allowance below zero"));
     return true;
   }
 
@@ -209,12 +211,12 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `sender` must have a balance of at least `amount`.
     */
   function _transfer(address sender, address recipient, uint256 amount) internal increaseFactor {
-    require(sender != address(0), "ERC20: transfer from the zero address");
-    require(recipient != address(0), "ERC20: transfer to the zero address");
+    require(sender != address(0), "Coinage: transfer from the zero address");
+    require(recipient != address(0), "Coinage: transfer to the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
-    _balances[sender] = _balances[sender].sub(rbAmount, "ERC20: transfer amount exceeds balance");
+    _balances[sender] = _balances[sender].sub(rbAmount, "Coinage: transfer amount exceeds balance");
     _balances[recipient] = _balances[recipient].add(rbAmount);
     emit Transfer(sender, recipient, _toRAYFactored(rbAmount));
   }
@@ -229,7 +231,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `to` cannot be the zero address.
     */
   function _mint(address account, uint256 amount) internal increaseFactor {
-    require(account != address(0), "ERC20: mint to the zero address");
+    require(account != address(0), "Coinage: mint to the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
@@ -250,11 +252,11 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `account` must have at least `amount` tokens.
     */
   function _burn(address account, uint256 amount) internal increaseFactor {
-    require(account != address(0), "ERC20: burn from the zero address");
+    require(account != address(0), "Coinage: burn from the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
-    _balances[account] = _balances[account].sub(rbAmount, "ERC20: burn amount exceeds balance");
+    _balances[account] = _balances[account].sub(rbAmount, "Coinage: burn amount exceeds balance");
     _totalSupply = _totalSupply.sub(rbAmount);
     emit Transfer(account, address(0), _toRAYFactored(rbAmount));
   }
@@ -273,8 +275,8 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `spender` cannot be the zero address.
     */
   function _approve(address owner, address spender, uint256 amount) internal increaseFactor {
-    require(owner != address(0), "ERC20: approve from the zero address");
-    require(spender != address(0), "ERC20: approve to the zero address");
+    require(owner != address(0), "Coinage: approve from the zero address");
+    require(spender != address(0), "Coinage: approve to the zero address");
 
     _allowances[owner][spender] = amount;
     emit Approval(owner, spender, amount);
@@ -288,7 +290,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     */
   function _burnFrom(address account, uint256 amount) internal increaseFactor {
     _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "ERC20: burn amount exceeds allowance"));
+    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "Coinage: burn amount exceeds allowance"));
   }
 
   // helpers
