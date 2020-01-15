@@ -1,6 +1,6 @@
 {
   "name": "coinage-token",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "",
   "main": "truffle-config.js",
   "scripts": {
@@ -9,8 +9,8 @@
     "compile": "truffle compile"
   },
   "directories": {
-    "test": "truffle test --exit --bail",
-    "build": "truffle compile"
+    "test": "./test",
+    "build": "./build"
   },
   "dependencies": {},
   "devDependencies": {
@@ -30,7 +30,8 @@
     "lodash": "^4.17.15",
     "mocha": "^7.0.0",
     "openzeppelin-solidity": "^2.4.0",
-    "truffle": "^5.1.7"
+    "truffle": "^5.1.7",
+    "web3-utils": "^1.2.4"
   },
   "repository": {
     "type": "git",
