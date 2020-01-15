@@ -294,7 +294,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   /// @dev This function makes it easy to get factor
   /// @return The factor
   function factor() public view returns (uint) {
-    return _applyFactor(factorAt(block.number));
+    return factorAt(block.number);
   }
 
 
@@ -323,7 +323,8 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     if ((balances[_owner].length == 0)
       || (balances[_owner][0].fromBlock > _blockNumber)) {
       if (address(parentToken) != address(0)) {
-        return parentToken.balanceOfAt(_owner, min(_blockNumber, parentSnapShotBlock));
+        uint bn = min(_blockNumber, parentSnapShotBlock);
+        return _toWADBased(parentToken.balanceOfAt(_owner, bn), bn);
       } else {
         // Has no parent
         return 0;
@@ -355,7 +356,8 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     if ((totalSupplyHistory.length == 0)
       || (totalSupplyHistory[0].fromBlock > _blockNumber)) {
       if (address(parentToken) != address(0)) {
-        return parentToken.totalSupplyAt(min(_blockNumber, parentSnapShotBlock));
+        uint bn = min(_blockNumber, parentSnapShotBlock);
+        return _toWADBased(parentToken.totalSupplyAt(bn), bn);
       } else {
         return 0;
       }
@@ -371,24 +373,49 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   /// @return The factor value at `_blockNumber`
   function factorAt(uint _blockNumber) public view returns(uint) {
 
-    // These next few lines are used when the factor of CoinageSnapshot is
-    //  requested before a check point was ever created for this token, it
-    //  requires that the `parentToken.factorAt` be queried at the
-    //  genesis block for this token as that contains totalSupply of this
-    //  token at this block number.
-    if ((factorHistory.length == 0)
-      || (factorHistory[0].fromBlock > _blockNumber)) {
-      if (address(parentToken) != address(0)) {
-        return (parentToken.factorAt(min(_blockNumber, parentSnapShotBlock)));
-      } else {
-        return defaultFactor;
-      }
+    if (factorHistory[0].fromBlock > _blockNumber) {
+      return wdiv(
+        factorHistory[0].value,
+        wpow(factorIncrement, uint256(factorHistory[0].fromBlock - _blockNumber))
+      );
 
     // This will return the expected totalSupply during normal situations
     } else {
-      return getValueAt(factorHistory, _blockNumber);
+      (uint f, uint b) = getValueAtWithBlcokNumber(factorHistory, _blockNumber);
+      return wmul(f, wpow(factorIncrement, sub(_blockNumber, b)));
     }
   }
+
+////////////////
+// Clone Token Method
+////////////////
+
+    function createCloneToken(
+      string memory _cloneTokenName,
+      string memory _cloneTokenSymbol,
+      uint _factor,
+      uint _factorIncrement,
+      uint _snapshotBlock,
+      bool _transfersEnabled
+    ) public returns(address) {
+      if (_snapshotBlock == 0) _snapshotBlock = block.number;
+
+      CoinageSnapshot cloneToken = tokenFactory.createCloneToken(
+        address(uint160(address(this))),
+        _snapshotBlock,
+        _cloneTokenName,
+        _cloneTokenSymbol,
+        _factor,
+        _factorIncrement,
+        _transfersEnabled
+      );
+
+      cloneToken.changeController(msg.sender);
+
+      // An event to make the token easy to find on the blockchain
+      emit NewCloneToken(address(cloneToken), _snapshotBlock);
+      return address(cloneToken);
+    }
 
 ////////////////
 // Generate and destroy tokens
@@ -457,12 +484,21 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   /// @param _block The block number to retrieve the value at
   /// @return The number of tokens being queried
   function getValueAt(Checkpoint[] storage checkpoints, uint _block) view internal returns (uint) {
-    if (checkpoints.length == 0) return 0;
+    (uint v, uint _) = getValueAtWithBlcokNumber(checkpoints, _block);
+    return v;
+  }
+
+  /// @dev `getValueAt` retrieves the number of tokens at a given block number
+  /// @param checkpoints The history of values being queried
+  /// @param _block The block number to retrieve the value at
+  /// @return The number of tokens being queried
+  function getValueAtWithBlcokNumber(Checkpoint[] storage checkpoints, uint _block) view internal returns (uint, uint) {
+    if (checkpoints.length == 0) return (0, 0);
 
     // Shortcut for the actual value
     if (_block >= checkpoints[checkpoints.length-1].fromBlock)
-      return checkpoints[checkpoints.length-1].value;
-    if (_block < checkpoints[0].fromBlock) return 0;
+      return (checkpoints[checkpoints.length-1].value, checkpoints[checkpoints.length-1].fromBlock);
+    if (_block < checkpoints[0].fromBlock) return (0, checkpoints[0].fromBlock);
 
     // Binary search of the value in the array
     uint min = 0;
@@ -475,7 +511,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
         max = mid-1;
       }
     }
-    return checkpoints[min].value;
+    return (checkpoints[min].value, checkpoints[min].fromBlock);
   }
 
   /// @dev `updateValueAtNow` used to update the `balances` map and the
@@ -564,19 +600,12 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     return _applyFactorAt(v, block.number);
   }
 
+  /**
+   * @dev apply factor to {v} at a specific block
+   */
   function _applyFactorAt(uint256 v, uint256 blockNumber) internal view returns (uint256) {
-    uint256 f = factorAt(blockNumber);
-
-    uint256 lastBlockNumber = factorHistory[factorHistory.length - 1].fromBlock;
-    uint256 n = sub(blockNumber, lastBlockNumber);
-
-    if (n == 0) {
-      return wmul(v, f);
-    }
-
-    return wmul(v, wmul(f, wpow(factorIncrement, n)));
+    return wmul(v, factorAt(blockNumber));
   }
-
 
 ////////////////
 // Modifiers
