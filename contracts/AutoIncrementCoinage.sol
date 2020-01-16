@@ -14,7 +14,7 @@ import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20
 /**
  * @dev Implementation of coin age token based on ERC20 of openzeppelin-solidity
  *
- * Coinage stores `_totalSupply` and `_balances` as RAY BASED value,
+ * AutoIncrementCoinage stores `_totalSupply` and `_balances` as RAY BASED value,
  * `_allowances` as RAY FACTORED value.
  *
  * This takes public function (including _approve) parameters as RAY FACTORED value
@@ -24,7 +24,7 @@ import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20
  *
  *  factor increases exponentially for each block mined.
  */
-contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
+contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
   using SafeMath for uint256;
 
   mapping (address => uint256) private _balances;
@@ -57,7 +57,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
   }
 
   modifier onlyTransfersEnabled() {
-    require(msg.sender == owner() || _transfersEnabled, "Coinage: transfer not allowed");
+    require(msg.sender == owner() || _transfersEnabled, "AutoIncrementCoinage: transfer not allowed");
     _;
   }
 
@@ -156,7 +156,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     */
   function transferFrom(address sender, address recipient, uint256 amount) public onlyTransfersEnabled returns (bool) {
     _transfer(sender, recipient, amount);
-    _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "Coinage: transfer amount exceeds allowance"));
+    _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "AutoIncrementCoinage: transfer amount exceeds allowance"));
     return true;
   }
 
@@ -192,7 +192,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * `subtractedValue`.
     */
   function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "Coinage: decreased allowance below zero"));
+    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "AutoIncrementCoinage: decreased allowance below zero"));
     return true;
   }
 
@@ -211,12 +211,12 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `sender` must have a balance of at least `amount`.
     */
   function _transfer(address sender, address recipient, uint256 amount) internal increaseFactor {
-    require(sender != address(0), "Coinage: transfer from the zero address");
-    require(recipient != address(0), "Coinage: transfer to the zero address");
+    require(sender != address(0), "AutoIncrementCoinage: transfer from the zero address");
+    require(recipient != address(0), "AutoIncrementCoinage: transfer to the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
-    _balances[sender] = _balances[sender].sub(rbAmount, "Coinage: transfer amount exceeds balance");
+    _balances[sender] = _balances[sender].sub(rbAmount, "AutoIncrementCoinage: transfer amount exceeds balance");
     _balances[recipient] = _balances[recipient].add(rbAmount);
     emit Transfer(sender, recipient, _toRAYFactored(rbAmount));
   }
@@ -231,7 +231,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `to` cannot be the zero address.
     */
   function _mint(address account, uint256 amount) internal increaseFactor {
-    require(account != address(0), "Coinage: mint to the zero address");
+    require(account != address(0), "AutoIncrementCoinage: mint to the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
@@ -252,11 +252,11 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `account` must have at least `amount` tokens.
     */
   function _burn(address account, uint256 amount) internal increaseFactor {
-    require(account != address(0), "Coinage: burn from the zero address");
+    require(account != address(0), "AutoIncrementCoinage: burn from the zero address");
 
     uint256 rbAmount = _toRAYBased(amount);
 
-    _balances[account] = _balances[account].sub(rbAmount, "Coinage: burn amount exceeds balance");
+    _balances[account] = _balances[account].sub(rbAmount, "AutoIncrementCoinage: burn amount exceeds balance");
     _totalSupply = _totalSupply.sub(rbAmount);
     emit Transfer(account, address(0), _toRAYFactored(rbAmount));
   }
@@ -275,8 +275,8 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     * - `spender` cannot be the zero address.
     */
   function _approve(address owner, address spender, uint256 amount) internal increaseFactor {
-    require(owner != address(0), "Coinage: approve from the zero address");
-    require(spender != address(0), "Coinage: approve to the zero address");
+    require(owner != address(0), "AutoIncrementCoinage: approve from the zero address");
+    require(spender != address(0), "AutoIncrementCoinage: approve to the zero address");
 
     _allowances[owner][spender] = amount;
     emit Approval(owner, spender, amount);
@@ -290,7 +290,7 @@ contract Coinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
     */
   function _burnFrom(address account, uint256 amount) internal increaseFactor {
     _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "Coinage: burn amount exceeds allowance"));
+    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "AutoIncrementCoinage: burn amount exceeds allowance"));
   }
 
   // helpers

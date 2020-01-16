@@ -2,9 +2,9 @@ pragma solidity ^0.5.12;
 
 import { ERC20Mintable } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
 import { ERC20Burnable } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
-import {Coinage} from "../Coinage.sol";
+import { AutoIncrementCoinage } from "../AutoIncrementCoinage.sol";
 
-contract CoinageMock is ERC20Mintable, ERC20Burnable, Coinage {
+contract AutoIncrementCoinageMock is ERC20Mintable, ERC20Burnable, AutoIncrementCoinage {
   constructor (
     string memory name,
     string memory symbol,
@@ -13,6 +13,6 @@ contract CoinageMock is ERC20Mintable, ERC20Burnable, Coinage {
     bool transfersEnabled
   )
     public
-    Coinage(name, symbol, factor, factorIncrement, transfersEnabled)
+    AutoIncrementCoinage(name, symbol, factor, factorIncrement, transfersEnabled)
   {}
 }

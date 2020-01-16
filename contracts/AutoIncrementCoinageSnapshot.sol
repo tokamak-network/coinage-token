@@ -18,7 +18,7 @@ pragma solidity ^0.5.12;
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/// @title CoinageSnapshot Contract
+/// @title AutoIncrementCoinageSnapshot Contract
 /// @author Jordi Baylina
 /// @dev This token contract's goal is to make it easy for anyone to clone this
 ///  token using the token distribution at a given block, this will allow DAO's
@@ -40,7 +40,7 @@ contract ApproveAndCallFallBack {
 /// @dev The actual token contract, the default controller is the msg.sender
 ///  that deploys the contract, so usually this token will be deployed by a
 ///  token controller contract, which Giveth will call a "Campaign"
-contract CoinageSnapshot is IERC20, DSMath, Controlled {
+contract AutoIncrementCoinageSnapshot is IERC20, DSMath, Controlled {
 
   uint public constant defaultFactor = 10 ** 18;
   uint8 public constant decimals = 18;        // Number of decimals of the smallest unit
@@ -63,7 +63,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
 
   // `parentToken` is the Token address that was cloned to produce this token;
   //  it will be 0x0 for a token that was not cloned
-  CoinageSnapshot public parentToken;
+  AutoIncrementCoinageSnapshot public parentToken;
 
   // `parentSnapShotBlock` is the block number from the Parent Token that was
   //  used to determine the initial distribution of the Clone Token
@@ -87,7 +87,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
   bool public transfersEnabled;
 
   // The factory used to create new clone tokens
-  CoinageSnapshotFactory public tokenFactory;
+  AutoIncrementCoinageSnapshotFactory public tokenFactory;
 
   Checkpoint[] factorHistory;
 
@@ -98,8 +98,8 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
 // Constructor
 ////////////////
 
-  /// @notice Constructor to create a CoinageSnapshot
-  /// @param _tokenFactory The address of the CoinageSnapshotFactory contract that
+  /// @notice Constructor to create a AutoIncrementCoinageSnapshot
+  /// @param _tokenFactory The address of the AutoIncrementCoinageSnapshotFactory contract that
   ///  will create the Clone token contracts, the token factory needs to be
   ///  deployed first
   /// @param _parentToken Address of the parent token, set to 0x0 if it is a
@@ -120,10 +120,10 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     uint _factorIncrement,
     bool _transfersEnabled
   ) public {
-    tokenFactory = CoinageSnapshotFactory(_tokenFactory);
+    tokenFactory = AutoIncrementCoinageSnapshotFactory(_tokenFactory);
     name = _tokenName;                  // Set the name
     symbol = _tokenSymbol;              // Set the symbol
-    parentToken = CoinageSnapshot(_parentToken);
+    parentToken = AutoIncrementCoinageSnapshot(_parentToken);
     parentSnapShotBlock = _parentSnapShotBlock;
     factorIncrement = _factorIncrement;
     transfersEnabled = _transfersEnabled;
@@ -172,7 +172,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
       require(transfersEnabled);
 
       // The standard ERC 20 transferFrom functionality
-      require(allowed[_from][msg.sender] >= _amount, "CoinageSnapshot: transfer amount exceeds allowance");
+      require(allowed[_from][msg.sender] >= _amount, "AutoIncrementCoinageSnapshot: transfer amount exceeds allowance");
       allowed[_from][msg.sender] -= _amount;
       emit Approval(_from, msg.sender, allowed[_from][msg.sender]);
     }
@@ -196,15 +196,15 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
        require(parentSnapShotBlock < block.number, "T?");
 
        // Do not allow transfer to 0x0 or the token contract itself
-       require(_to != address(0), "CoinageSnapshot: transfer to the zero address");
-       require(_to != address(this), "CoinageSnapshot: transfer to CoinageSnapshot");
+       require(_to != address(0), "AutoIncrementCoinageSnapshot: transfer to the zero address");
+       require(_to != address(this), "AutoIncrementCoinageSnapshot: transfer to the token");
 
        // If the amount being transfered is more than the balance of the
        //  account the transfer throws
        uint previousBalanceFrom = basedBalanceOfAt(_from, block.number);
        uint wbAmount = _toWADBased(_amount, block.number);
 
-       require(previousBalanceFrom >= wbAmount, "CoinageSnapshot: transfer amount exceeds balance");
+       require(previousBalanceFrom >= wbAmount, "AutoIncrementCoinageSnapshot: transfer amount exceeds balance");
        // Alerts the token controller of the transfer
        if (isContract(controller)) {
          require(TokenController(controller).onTransfer(_from, _to, _toWADFactored(wbAmount, block.number)));
@@ -244,7 +244,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     //  allowance to zero by calling `approve(_spender,0)` if it is not
     //  already 0 to mitigate the race condition described here:
     //  https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
-    require((_amount == 0) || (allowed[msg.sender][_spender] == 0), "CoinageSnapshot: invalid approve amount");
+    require((_amount == 0) || (allowed[msg.sender][_spender] == 0), "AutoIncrementCoinageSnapshot: invalid approve amount");
 
     // Alerts the token controller of the approve function call
     if (isContract(controller)) {
@@ -400,7 +400,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
     ) public returns(address) {
       if (_snapshotBlock == 0) _snapshotBlock = block.number;
 
-      CoinageSnapshot cloneToken = tokenFactory.createCloneToken(
+      AutoIncrementCoinageSnapshot cloneToken = tokenFactory.createCloneToken(
         address(uint160(address(this))),
         _snapshotBlock,
         _cloneTokenName,
@@ -570,7 +570,7 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
       return;
     }
 
-    CoinageSnapshot token = CoinageSnapshot(_token);
+    AutoIncrementCoinageSnapshot token = AutoIncrementCoinageSnapshot(_token);
     uint balance = token.balanceOf(address(this));
     token.transfer(controller, balance);
     emit ClaimedTokens(_token, controller, balance);
@@ -639,13 +639,13 @@ contract CoinageSnapshot is IERC20, DSMath, Controlled {
 
 
 ////////////////
-// CoinageSnapshotFactory
+// AutoIncrementCoinageSnapshotFactory
 ////////////////
 
 /// @dev This contract is used to generate clone contracts from a contract.
 ///  In solidity this is the way to create a contract from a contract of the
 ///  same class
-contract CoinageSnapshotFactory {
+contract AutoIncrementCoinageSnapshotFactory {
 
   /// @notice Update the DApp by creating a new token with new functionalities
   ///  the msg.sender becomes the controller of this clone token
@@ -664,8 +664,8 @@ contract CoinageSnapshotFactory {
     uint _factor,
     uint _factorIncrement,
     bool _transfersEnabled
-  ) public returns (CoinageSnapshot) {
-    CoinageSnapshot newToken = new CoinageSnapshot(
+  ) public returns (AutoIncrementCoinageSnapshot) {
+    AutoIncrementCoinageSnapshot newToken = new AutoIncrementCoinageSnapshot(
       address(uint160(address(this))),
       _parentToken,
       _snapshotBlock,

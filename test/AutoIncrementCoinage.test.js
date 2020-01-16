@@ -17,16 +17,14 @@ const { ZERO_ADDRESS } = constants;
 
 const { toBN } = web3.utils;
 
-const Coinage = contract.fromArtifact('CoinageSnapshot');
-const Factory = contract.fromArtifact('CoinageSnapshotFactory');
+const AutoIncrementCoinage = contract.fromArtifact('AutoIncrementCoinageMock');
 
 const CAG = createCurrency('CAG');
-const CAG_UNIT = 'wei';
+const CAG_UNIT = 'ray';
 
-const e = new BN('15000');
+const e = new BN('100');
 
-// TODO: add minimi snapshot test case
-describe('CoinageSnapshot', function () {
+describe('AutoIncrementCoinage', function () {
   let factor;
   let factorIncrement;
 
@@ -40,25 +38,17 @@ describe('CoinageSnapshot', function () {
     factor = CAG('1.00');
     factorIncrement = CAG('1.10');
 
-    const { factory, coinage } = await deploy();
-    this.factory = factory;
-    this.coinage = coinage;
+    this.coinage = await deploy();
   });
 
-  async function deploy () {
-    const factory = await Factory.new();
-    const coinage = await Coinage.new(
-      factory.address,
-      ZERO_ADDRESS,
-      0,
-      'CoinageSnapshot Test',
-      'CAST',
+  function deploy () {
+    return AutoIncrementCoinage.new(
+      'AutoIncrementCoinage Test',
+      'CAT',
       factor.toFixed(CAG_UNIT),
       factorIncrement.toFixed(CAG_UNIT),
       true,
     );
-
-    return { factory, coinage };
   }
 
   // TODO: exponentiation by squaring?
@@ -70,9 +60,8 @@ describe('CoinageSnapshot', function () {
     return v.times(f);
   }
 
-  async function advanceRandomBlock (min, max = 0) {
-    const n1 = (Math.floor(Math.random() * 20) + (min || 1));
-    const n = max ? n1 % max + 1 : n1;
+  async function advanceRandomBlock (min) {
+    const n = Math.floor(Math.random() * 20) + (min || 1);
 
     await Promise.all(range(n).map(_ => time.advanceBlock()));
     return n;
@@ -133,7 +122,7 @@ describe('CoinageSnapshot', function () {
       const amount = CAG('1000');
 
       beforeEach(async function () {
-        await this.coinage.generateTokens(tokenOwner, amount.toFixed(CAG_UNIT));
+        await this.coinage.mint(tokenOwner, amount.toFixed(CAG_UNIT));
       });
 
       it('should mint amount of tokens', async function () {
@@ -146,23 +135,11 @@ describe('CoinageSnapshot', function () {
         await checkBalanceProm(this.coinage.balanceOf(tokenOwner), expectedAmount);
       });
 
-      it('balance at specific block should not be changed', async function () {
-        const blockNumber = (await time.latestBlock()).toNumber();
-        await advanceRandomBlock(4);
-        await checkBalanceProm(this.coinage.balanceOfAt(tokenOwner, blockNumber), amount);
-      });
-
       it('total supply should increase exponentially after n blocks', async function () {
         const totalSupply = CAG(await this.coinage.totalSupply(), CAG_UNIT);
         const n = await advanceRandomBlock(4);
         const expectedTotalSupply = fpow(totalSupply, n);
         await checkBalanceProm(this.coinage.totalSupply(), expectedTotalSupply);
-      });
-
-      it('total supply at specific block should not be changed', async function () {
-        const blockNumber = (await time.latestBlock()).toNumber();
-        await advanceRandomBlock(4);
-        await checkBalanceProm(this.coinage.totalSupplyAt(blockNumber), amount);
       });
     });
   });
@@ -173,7 +150,7 @@ describe('CoinageSnapshot', function () {
 
     beforeEach(async function () {
       await advanceRandomBlock();
-      await this.coinage.generateTokens(from, initialSupply.toFixed(CAG_UNIT));
+      await this.coinage.mint(from, initialSupply.toFixed(CAG_UNIT));
     });
 
     // shouldBehaveLikeERC20Transfer
@@ -183,7 +160,7 @@ describe('CoinageSnapshot', function () {
           it('reverts', async function () {
             const amount = CAG(await this.coinage.balanceOf(from), CAG_UNIT).times(CAG('2'));
             await expectRevert(this.coinage.transfer(to, amount.toFixed(CAG_UNIT), { from }),
-              'CoinageSnapshot: transfer amount exceeds balance',
+              'AutoIncrementCoinage: transfer amount exceeds balance',
             );
           });
         });
@@ -223,8 +200,8 @@ describe('CoinageSnapshot', function () {
           const amount = CAG('0');
 
           it('transfers the requested amount', async function () {
-            await this.coinage.generateTokens(from, CAG('20').toFixed(CAG_UNIT));
-            await this.coinage.generateTokens(to, CAG('20').toFixed(CAG_UNIT));
+            await this.coinage.mint(from, CAG('20').toFixed(CAG_UNIT));
+            await this.coinage.mint(to, CAG('20').toFixed(CAG_UNIT));
 
             const expectedFromBalance = CAG(await this.coinage.balanceOf(from), CAG_UNIT).times(factorIncrement);
             const expectedToBalance = CAG(await this.coinage.balanceOf(to), CAG_UNIT).times(factorIncrement);
@@ -253,7 +230,7 @@ describe('CoinageSnapshot', function () {
         it('reverts', async function () {
           const fromBalance = CAG(await this.coinage.balanceOf(from), CAG_UNIT);
           await expectRevert(this.coinage.transfer(ZERO_ADDRESS, fromBalance.toFixed(CAG_UNIT), { from }),
-            'CoinageSnapshot: transfer to the zero address',
+            'AutoIncrementCoinage: transfer to the zero address',
           );
         });
       });
@@ -266,7 +243,7 @@ describe('CoinageSnapshot', function () {
       const tokenOwner = accounts[3];
 
       beforeEach(async function () {
-        await this.coinage.generateTokens(tokenOwner, initialSupply.toFixed(CAG_UNIT));
+        await this.coinage.mint(tokenOwner, initialSupply.toFixed(CAG_UNIT));
       });
 
       describe('when the token owner is not the zero address', function () {
@@ -327,8 +304,7 @@ describe('CoinageSnapshot', function () {
 
               it('reverts', async function () {
                 await expectRevert(this.coinage.transferFrom(
-                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }),
-                'CoinageSnapshot: transfer amount exceeds allowance',
+                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'AutoIncrementCoinage: transfer amount exceeds balance',
                 );
               });
             });
@@ -344,7 +320,7 @@ describe('CoinageSnapshot', function () {
 
               it('reverts', async function () {
                 await expectRevert(this.coinage.transferFrom(
-                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'CoinageSnapshot: transfer amount exceeds allowance',
+                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'AutoIncrementCoinage: transfer amount exceeds allowance',
                 );
               });
             });
@@ -354,7 +330,7 @@ describe('CoinageSnapshot', function () {
 
               it('reverts', async function () {
                 await expectRevert(this.coinage.transferFrom(
-                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'CoinageSnapshot: transfer amount exceeds allowance',
+                  tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'AutoIncrementCoinage: transfer amount exceeds balance',
                 );
               });
             });
@@ -371,7 +347,7 @@ describe('CoinageSnapshot', function () {
 
           it('reverts', async function () {
             await expectRevert(this.coinage.transferFrom(
-              tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'CoinageSnapshot: transfer to the zero address',
+              tokenOwner, to, amount.toFixed(CAG_UNIT), { from: spender }), 'AutoIncrementCoinage: transfer to the zero address',
             );
           });
         });
@@ -410,12 +386,10 @@ describe('CoinageSnapshot', function () {
               await this.coinage.approve(spender, new BN(1), { from: owner });
             });
 
-            describe('when the token owner replaces the previous approved amount', function () {
-              it('reverts', async function () {
-                await expectRevert(this.coinage.approve(spender, amount.toFixed(CAG_UNIT), { from: owner }),
-                  'CoinageSnapshot: invalid approve amount',
-                );
-              });
+            it('approves the requested amount and replaces the previous one', async function () {
+              await this.coinage.approve(spender, amount.toFixed(CAG_UNIT), { from: owner });
+
+              expect(await this.coinage.allowance(owner, spender)).to.be.bignumber.equal(amount.toFixed(CAG_UNIT));
             });
           });
         });
@@ -446,147 +420,21 @@ describe('CoinageSnapshot', function () {
               await this.coinage.approve(spender, new BN(1), { from: owner });
             });
 
-            describe('when the token owner replaces the previous approved amount', function () {
-              it('reverts', async function () {
-                await expectRevert(this.coinage.approve(spender, amount.toFixed(CAG_UNIT), { from: owner }),
-                  'CoinageSnapshot: invalid approve amount',
-                );
-              });
+            it('approves the requested amount and replaces the previous one', async function () {
+              await this.coinage.approve(spender, amount.toFixed(CAG_UNIT), { from: owner });
+
+              expect(await this.coinage.allowance(owner, spender)).to.be.bignumber.equal(amount.toFixed(CAG_UNIT));
             });
           });
         });
       });
-    });
-  });
 
-  // omit duplicate test cases in #ERC20
-  describe('#MiniMeToken', function () {
-    describe('#destroyTokens', function () {
-      const amount = initialSupply;
-      const tokenOwner = accounts[0];
-
-      beforeEach(async function () {
-        await this.coinage.generateTokens(tokenOwner, amount.toFixed(CAG_UNIT));
-      });
-
-      it('should destroy tokens', async function () {
-        const n = await advanceRandomBlock(5);
-        const expectedTokenOwnerBalance = fpow(amount, n + 1).minus(amount);
-
-        await this.coinage.destroyTokens(tokenOwner, amount.toFixed(CAG_UNIT));
-
-        await checkBalanceProm(this.coinage.balanceOf(tokenOwner), expectedTokenOwnerBalance);
-      });
-    });
-
-    describe('#createCloneToken', function () {
-      const amount = initialSupply;
-      const tokenOwner = accounts[0];
-
-      beforeEach(async function () {
-        const { receipt: { blockNumber } } = await this.coinage.generateTokens(tokenOwner, amount.toFixed(CAG_UNIT));
-
-        this.generatedBlock = blockNumber;
-        this.skippedBlock = (await advanceRandomBlock(3, 20));
-
-        // console.log('this.skippedBlock', this.skippedBlock);
-
-        const { logs } = await this.coinage.createCloneToken(
-          'Cloned CoinageSnapshot Test',
-          'CCT',
-          factor.toFixed(CAG_UNIT),
-          factorIncrement.toFixed(CAG_UNIT),
-          0,
-          true,
-        );
-
-        const ev = expectEvent.inLogs(logs, 'NewCloneToken');
-
-        this.cloned = await Coinage.at(ev.args.cloneToken);
-        this.snapshotBlock = ev.args.snapshotBlock.toNumber();
-      });
-
-      afterEach(function () {
-        delete this.generatedBlock;
-        delete this.skippedBlock;
-        delete this.cloned;
-        delete this.snapshotBlock;
-      });
-
-      describe('when token owner transfer cloned tokens', function () {
-        const to = accounts[1];
-
-        beforeEach(async function () {
-          const { logs } = await this.cloned.transfer(to, amount.toFixed(CAG_UNIT), { from: tokenOwner });
-          const ev = expectEvent.inLogs(logs, 'Transfer', {
-            from: tokenOwner,
-            to: to,
-          });
-          checkBalance(ev.args.value, amount);
+      describe('when the spender is the zero address', function () {
+        it('reverts', async function () {
+          await expectRevert(this.coinage.approve(ZERO_ADDRESS, initialSupply.toFixed(CAG_UNIT), { from: owner }),
+            'AutoIncrementCoinage: approve to the zero address',
+          );
         });
-
-        it('balance in the cloned token should be deducted', async function () {
-          const expectedTokenOwnerBalance = fpow(amount, this.skippedBlock + 2).minus(amount);
-          const expectedToBalance = amount;
-
-          await checkBalanceProm(this.cloned.balanceOf(tokenOwner), expectedTokenOwnerBalance);
-          await checkBalanceProm(this.cloned.balanceOf(to), expectedToBalance);
-        });
-
-        it('balance in the original token should not be changed', async function () {
-          const expectedTokenOwnerBalance = fpow(amount, this.skippedBlock + 2);
-          const expectedToBalance = CAG('0');
-
-          await checkBalanceProm(this.coinage.balanceOf(tokenOwner), expectedTokenOwnerBalance);
-          await checkBalanceProm(this.coinage.balanceOf(to), expectedToBalance);
-        });
-
-        it('should clone token balance', async function () {
-          const f = function (token) {
-            return Promise.all(
-              range(this.generatedBlock, this.generatedBlock + this.skippedBlock + 1).map(
-                (bn, i) => checkBalanceProm(
-                  token.balanceOfAt(tokenOwner, bn),
-                  fpow(amount, i),
-                ),
-              ),
-            );
-          };
-
-          await f.call(this, this.coinage);
-          await f.call(this, this.cloned);
-        }).timeout(15000);
-
-        it('should clone total supply', async function () {
-          const f = function (token) {
-            return Promise.all(
-              range(this.generatedBlock, this.generatedBlock + this.skippedBlock + 1).map(
-                (bn, i) => checkBalanceProm(
-                  token.totalSupplyAt(bn),
-                  fpow(amount, i),
-                ),
-              ),
-            );
-          };
-
-          await f.call(this, this.coinage);
-          await f.call(this, this.cloned);
-        }).timeout(15000);
-      });
-
-      it('should clone the cloned token', async function () {
-        const { logs } = await this.coinage.createCloneToken(
-          'Cloned CoinageSnapshot Test2',
-          'CCT2',
-          factor.toFixed(CAG_UNIT),
-          factorIncrement.toFixed(CAG_UNIT),
-          0,
-          true,
-        );
-
-        const e = expectEvent.inLogs(logs, 'NewCloneToken');
-
-        this.cloned2 = await Coinage.at(e.args.cloneToken);
       });
     });
   });
