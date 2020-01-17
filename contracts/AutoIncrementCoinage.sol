@@ -27,32 +27,24 @@ import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20
 contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed {
   using SafeMath for uint256;
 
-  mapping (address => uint256) private _balances;
+  mapping (address => uint256) internal _balances;
 
-  mapping (address => mapping (address => uint256)) private _allowances;
+  mapping (address => mapping (address => uint256)) internal _allowances;
 
-  uint256 private _totalSupply;
+  uint256 internal _totalSupply;
 
-  uint256 private _factor;
+  uint256 internal _factor;
 
-  uint256 private _factorIncrement;
+  uint256 internal _factorIncrement;
 
-  uint256 private _lastBlock;
+  uint256 internal _lastBlock;
 
-  bool private _transfersEnabled;
+  bool internal _transfersEnabled;
 
   event FactorIncreased(uint256 factor);
 
   modifier increaseFactor() {
-    uint256 n = block.number - _lastBlock;
-
-    if (n > 0) {
-      _factor = rmul(_factor, rpow(_factorIncrement, n));
-      _lastBlock = block.number;
-
-      emit FactorIncreased(_factor);
-    }
-
+    _increaseFactor();
     _;
   }
 
@@ -85,7 +77,11 @@ contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed
     return _factorIncrement;
   }
 
-  function transfersEnabled() public returns (bool) {
+  function lastBlock() public view returns (uint256) {
+    return _lastBlock;
+  }
+
+  function transfersEnabled() public view returns (bool) {
     return _transfersEnabled;
   }
 
@@ -230,6 +226,7 @@ contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed
     *
     * - `to` cannot be the zero address.
     */
+  // function _mint(address account, uint256 amount) internal {
   function _mint(address account, uint256 amount) internal increaseFactor {
     require(account != address(0), "AutoIncrementCoinage: mint to the zero address");
 
@@ -294,6 +291,42 @@ contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed
   }
 
   // helpers
+
+  function _increaseFactor() internal {
+    uint256 n = block.number - _lastBlock;
+
+    if (n > 0) {
+      _factor = _calculateFactor(n);
+      _lastBlock = block.number;
+
+      emit FactorIncreased(_factor);
+    }
+  }
+
+  /**
+   * @param v the value to be factored
+   */
+  function _applyFactor(uint256 v) internal view returns (uint256) {
+    if (v == 0) {
+      return 0;
+    }
+
+    uint256 n = block.number - _lastBlock;
+
+    if (n == 0) {
+      return rmul(v, _factor);
+    }
+
+    return rmul(v, _calculateFactor(n));
+  }
+
+  /**
+   * @dev Override _calculateFactor to change factor calculation.
+   */
+  function _calculateFactor(uint256 n) internal view returns (uint256) {
+    return rmul(_factor, rpow(_factorIncrement, n));
+  }
+
   /**
    * @dev Calculate RAY BASED from RAY FACTORED
    */
@@ -306,15 +339,5 @@ contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed
    */
   function _toRAYFactored(uint256 rb) internal view returns (uint256 rf) {
     return rmul(rb, _factor);
-  }
-
-  function _applyFactor(uint256 r) internal view returns (uint256) {
-    uint256 n = block.number - _lastBlock;
-
-    if (n == 0) {
-      return rmul(r, _factor);
-    }
-
-    return rmul(r, rmul(_factor, rpow(_factorIncrement, n)));
   }
 }
