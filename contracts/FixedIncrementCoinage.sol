@@ -1,13 +1,5 @@
 pragma solidity ^0.5.12;
 
-import { SafeMath } from "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import { Context } from "openzeppelin-solidity/contracts/GSN/Context.sol";
-import { DSMath } from "./lib/DSMath.sol";
-
-import { Ownable } from "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import { IERC20 } from "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
-
 import { AutoIncrementCoinage } from "./AutoIncrementCoinage.sol";
 
 
@@ -55,5 +47,3 @@ contract FixedIncrementCoinage is AutoIncrementCoinage {
     return rdiv(rmul(_factor, nextTotalSupply), prevTotalSupply);
   }
 }
-
-// "7e37be2022c0914b2680000000" --> 10000000000000000000000000000000 (1e31 = 1e4 RAY)
