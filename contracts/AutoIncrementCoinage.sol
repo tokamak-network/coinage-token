@@ -280,14 +280,17 @@ contract AutoIncrementCoinage is Context, IERC20, DSMath, Ownable, ERC20Detailed
   }
 
   /**
-    * @dev Destroys `rbAmount` tokens from `account`.`rbAmount` is then deducted
-    * from the caller's allowance.
+    * @dev Destroys `amount` tokens from `account`.`amount` is then deducted
+    * from the caller's allowance if caller is not owner.
+    * If caller is owner, just burn tokens from `account`
     *
     * See {_burn} and {_approve}.
     */
   function _burnFrom(address account, uint256 amount) internal increaseFactor {
     _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "AutoIncrementCoinage: burn amount exceeds allowance"));
+    if (!isOwner()) {
+      _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "AutoIncrementCoinage: burn amount exceeds allowance"));
+    }
   }
 
   // helpers

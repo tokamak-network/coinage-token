@@ -24,6 +24,7 @@ const CAG_UNIT = 'ray';
 
 const e = new BN('100');
 
+// TODO: add ERC20Burnable tests
 describe('AutoIncrementCoinage', function () {
   let factor;
   let factorIncrement;
