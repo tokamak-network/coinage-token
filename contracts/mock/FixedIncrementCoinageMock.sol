@@ -1,7 +1,7 @@
 pragma solidity ^0.5.12;
 
-import { ERC20Mintable } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
-import { ERC20Burnable } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
+import { ERC20Mintable } from "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol";
+import { ERC20Burnable } from "../../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Burnable.sol";
 import { FixedIncrementCoinage } from "../FixedIncrementCoinage.sol";
 
 contract FixedIncrementCoinageMock is ERC20Mintable, ERC20Burnable, FixedIncrementCoinage {

@@ -1,14 +1,13 @@
 // based on ERC20 implementation of openzeppelin-solidity: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/7552af95e4ec6fccd64a95b206f59a1b4ff91517/contracts/token/ERC20/ERC20.sol
 pragma solidity ^0.5.12;
 
-import { SafeMath } from "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import { Context } from "openzeppelin-solidity/contracts/GSN/Context.sol";
+import { SafeMath } from "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
+import { Context } from "../node_modules/openzeppelin-solidity/contracts/GSN/Context.sol";
+import { Ownable } from "../node_modules/openzeppelin-solidity/contracts/ownership/Ownable.sol";
+import { IERC20 } from "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import { ERC20Detailed } from "../node_modules/openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
+
 import { DSMath } from "./lib/DSMath.sol";
-
-import { Ownable } from "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import { IERC20 } from "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import { ERC20Detailed } from "openzeppelin-solidity/contracts/token/ERC20/ERC20Detailed.sol";
-
 
 
 /**

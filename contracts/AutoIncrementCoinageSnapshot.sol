@@ -27,7 +27,7 @@ pragma solidity ^0.5.12;
 /// @dev It is ERC20 compliant, but still needs to under go further testing.
 
 import { DSMath } from "./lib/DSMath.sol";
-import { IERC20 } from "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import { IERC20 } from "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 import "./lib/minime/Controlled.sol";
 import "./lib/minime/TokenController.sol";
