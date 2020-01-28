@@ -31,6 +31,7 @@ import { IERC20 } from "../node_modules/openzeppelin-solidity/contracts/token/ER
 
 import "./lib/minime/Controlled.sol";
 import "./lib/minime/TokenController.sol";
+import "./lib/minime/ApproveAndCallFallBack.sol";
 
 
 /// @dev The actual token contract, the default controller is the msg.sender

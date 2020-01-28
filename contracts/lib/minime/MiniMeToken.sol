@@ -27,10 +27,8 @@ pragma solidity ^0.5.12;
 
 import "./Controlled.sol";
 import "./TokenController.sol";
+import "./ApproveAndCallFallBack.sol";
 
-contract ApproveAndCallFallBack {
-    function receiveApproval(address from, uint256 _amount, address _token, bytes memory _data) public;
-}
 
 /// @dev The actual token contract, the default controller is the msg.sender
 ///  that deploys the contract, so usually this token will be deployed by a
