@@ -33,10 +33,6 @@ import "./lib/minime/Controlled.sol";
 import "./lib/minime/TokenController.sol";
 
 
-contract ApproveAndCallFallBack {
-  function receiveApproval(address from, uint256 _amount, address _token, bytes memory _data) public;
-}
-
 /// @dev The actual token contract, the default controller is the msg.sender
 ///  that deploys the contract, so usually this token will be deployed by a
 ///  token controller contract, which Giveth will call a "Campaign"
